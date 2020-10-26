@@ -2,31 +2,50 @@
 /*
 	calculator08buggy.cpp
 
-	Helpful comments removed.
+	grammer:
+	expression:
+		term
+		term + expression
+		term - expression
+	term:
+		primary
+		term * primary
+		term / primary
+	primary:
+		number
+		'(' + expression + ')'
+		'sqrt(' expression ')'
+		- primary
+		+ primary
 
-	We have inserted 3 bugs that the compiler will catch and 3 that it won't.
 */
 
 #include "../../std_lib_facilities.h"
+
 
 struct Token {
 	char kind;
 	double value;
 	string name;
-	Token(char ch) :kind(ch), value(0) { }
-	Token(char ch, double val) :kind(ch), value(val) { }
+	Token(char ch) 
+		:kind(ch), value(0) { }
+	Token(char ch, double val) 
+		:kind(ch), value(val) { }
+	Token(char ch, string n) 
+		:kind(ch), value(0), name(n) { } //first error
 };
 
 class Token_stream {
-	bool full;
-	Token buffer;
 public:
-	Token_stream() :full(0), buffer(0) { }
+	Token_stream() :full(false), buffer(0) { }
 
 	Token get();
 	void unget(Token t) { buffer = t; full = true; }
 
 	void ignore(char);
+private:
+	bool full;
+	Token buffer;
 };
 
 const char let = 'L';
@@ -34,6 +53,10 @@ const char quit = 'Q';
 const char print = ';';
 const char number = '8';
 const char name = 'a';
+const char square = 's';
+const string declkey = "let";
+const string quitkey = "quit";
+const string squarekey = "sqrt";
 
 Token Token_stream::get()
 {
@@ -71,10 +94,11 @@ Token Token_stream::get()
 		if (isalpha(ch)) {
 			string s;
 			s += ch;
-			while (cin.get(ch) && (isalpha(ch) || isdigit(ch))) s = ch;
+			while (cin.get(ch) && (isalpha(ch) || isdigit(ch))) s += ch; //2nd error compilor won'catch
 			cin.unget();
-			if (s == "let") return Token(let);
-			if (s == "quit") return Token(name);
+			if (s == squarekey) return Token(square); 
+			if (s == declkey) return Token(let); //another error? yes
+			if (s == quitkey) return Token(quit); //another error
 			return Token(name, s);
 		}
 		error("Bad token");
@@ -94,7 +118,8 @@ void Token_stream::ignore(char c)
 		if (ch == c) return;
 }
 
-struct Variable {
+class Variable {
+public:
 	string name;
 	double value;
 	Variable(string n, double v) :name(n), value(v) { }
@@ -136,8 +161,9 @@ double primary()
 	switch (t.kind) {
 	case '(':
 	{	double d = expression();
-	t = ts.get();
-	if (t.kind != ')') error("'(' expected");
+		t = ts.get();
+		if (t.kind != ')') error("')' expected");
+		return d; //error no retun
 	}
 	case '-':
 		return -primary();
@@ -145,6 +171,16 @@ double primary()
 		return t.value;
 	case name:
 		return get_value(t.name);
+	case square:
+	{
+		t = ts.get();
+		if (t.kind != '(') error("no opening parentheses after sqrt");
+		double d = expression();
+		t = ts.get();
+		if (t.kind != ')') error("unbalanced parentheses after sqrt");
+		if (d < 0) error("trying to take sqrt of negative expression");
+		return sqrt(d);
+	}
 	default:
 		error("primary expected");
 	}
@@ -234,7 +270,7 @@ void calculate()
 		ts.unget(t);
 		cout << result << statement() << endl;
 	}
-	catch (runtime_error& e) {
+	catch (exception& e) {
 		cerr << e.what() << endl;
 		clean_up_mess();
 	}
