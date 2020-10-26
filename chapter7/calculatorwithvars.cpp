@@ -143,36 +143,50 @@ public:
 	Variable(string n, double v, bool c) :name(n), value(v), constant(c){ }
 };
 
-vector<Variable> names;
+class Symbol_table {
+public:
+	double get(string s);
+	void set(string s, double d);
+	bool is_declared(string s);
+	void declare(string s, double d, bool c);
+private:
+	vector<Variable> var_tabel;
+};
 
-double get_value(string s)
+double Symbol_table::get(string s)
 {
-	for (int i = 0; i < names.size(); ++i)
-		if (names[i].name == s) return names[i].value;
+	for (Variable e : var_tabel)
+		if (e.name == s) return e.value;
 	error("get: undefined name ", s);
 }
 
-void set_value(string s, double d)
+void Symbol_table::set(string s, double d)
 {
-	for (int i = 0; i <= names.size(); ++i)
-		if (names[i].name == s) {
-			if (names[i].constant) {
+	for (Variable e : var_tabel)
+		if (e.name == s) {
+			if (e.constant) {
 				error("variable you are trying to set is constant");
 			}
-			names[i].value = d;
+			e.value = d;
 			return;
 		}
 	error("set: undefined name ", s);
 }
 
-bool is_declared(string s)
+bool Symbol_table::is_declared(string s)
 {
-	for (int i = 0; i < names.size(); ++i)
-		if (names[i].name == s) return true;
+	for (Variable e : var_tabel)
+		if (e.name == s) return true;
 	return false;
 }
 
+void Symbol_table::declare(string s, double d, bool c)
+{
+	var_tabel.push_back(Variable(s, d, c));
+}
+
 Token_stream ts;
+Symbol_table table;
 
 double expression();
 
@@ -191,7 +205,7 @@ double primary()
 	case number:
 		return t.value;
 	case name:
-		return get_value(t.name);
+		return table.get(t.name);
 	case square:
 	{
 		t = ts.get();
@@ -253,10 +267,10 @@ double assignment()
 	// We get there by knowing that a name and an '=' come next.
 	Token t = ts.get();
 	string var_name = t.name;
-	if (!is_declared(var_name)) error(var_name, " has not been declared");
+	if (!table.is_declared(var_name)) error(var_name, " has not been declared");
 	ts.get(); // Get rid of the '='
 	double d = expression();
-	set_value(var_name, d);
+	table.set(var_name, d);
 	return d;
 }
 
@@ -266,16 +280,15 @@ double declaration()
 	Token t2 = ts.get(); //name of var
 	if (t2.kind != name) error("name expected in declaration");
 	string name = t2.name;
-	if (is_declared(name)) error(name, " declared twice");
+	if (table.is_declared(name)) error(name, " declared twice");
 	Token t3 = ts.get();
 	if (t3.kind != '=') error("= missing in declaration of ", name);
 	double d = expression();
 	switch(t1.kind) {
 	case let:
-		names.push_back(Variable(name, d, false));
+		table.declare(name, d, false);
 	case con:
-		names.push_back(Variable(name, d, true));
-
+		table.declare(name, d, true);
 	}
 	return d;
 }
