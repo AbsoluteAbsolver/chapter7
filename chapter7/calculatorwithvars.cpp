@@ -51,7 +51,7 @@ class Token_stream {
 public:
 	//Token_stream() :full(false), buffer(0) { }
 
-	Token get();
+	Token get(istream& input);
 	void putback(Token t) { buffer.push_back(t); }
 	void ignore(char c);
 private:
@@ -70,7 +70,7 @@ const string constkey = "const";
 const string quitkey = "quit";
 const string squarekey = "sqrt";
 
-Token Token_stream::get()
+Token Token_stream::get(istream& input)
 {
 	if (!buffer.empty()) {
 		Token t = buffer.back();
@@ -78,7 +78,7 @@ Token Token_stream::get()
 		return t;
 	}
 	char ch;
-	cin >> ch;
+	input >> ch;
 	switch (ch) {
 	case '(':
 	case ')':
@@ -101,17 +101,17 @@ Token Token_stream::get()
 	case '7':
 	case '8':
 	case '9':
-	{	cin.unget();
+	{	input.unget();
 	double val;
-	cin >> val;
+	input >> val;
 	return Token(number, val);
 	}
 	default:
 		if (isalpha(ch)) {
 			string s;
 			s += ch;
-			while (cin.get(ch) && (isalpha(ch) || isdigit(ch) || ch == '_')) s += ch; //2nd error compilor won'catch
-			cin.unget();
+			while (input.get(ch) && (isalpha(ch) || isdigit(ch) || ch == '_')) s += ch; //2nd error compilor won'catch
+			input.unget();
 			if (s == squarekey) return Token(square); 
 			if (s == declkey) return Token(let); //another error? yes
 			if (s == constkey) return Token(con);
@@ -187,16 +187,17 @@ void Symbol_table::declare(string s, double d, bool c)
 
 Token_stream ts;
 Symbol_table table;
+istream& input = std::cin;
 
 double expression();
 
 double primary()
 {
-	Token t = ts.get();
+	Token t = ts.get(input);
 	switch (t.kind) {
 	case '(':
 	{	double d = expression();
-		t = ts.get();
+		t = ts.get(input);
 		if (t.kind != ')') error("')' expected");
 		return d; //error no retun
 	}
@@ -208,10 +209,10 @@ double primary()
 		return table.get(t.name);
 	case square:
 	{
-		t = ts.get();
+		t = ts.get(input);
 		if (t.kind != '(') error("no opening parentheses after sqrt");
 		double d = expression();
-		t = ts.get();
+		t = ts.get(input);
 		if (t.kind != ')') error("unbalanced parentheses after sqrt");
 		if (d < 0) error("trying to take sqrt of negative expression");
 		return sqrt(d);
@@ -225,7 +226,7 @@ double term()
 {
 	double left = primary();
 	while (true) {
-		Token t = ts.get();
+		Token t = ts.get(input);
 		switch (t.kind) {
 		case '*':
 			left *= primary();
@@ -247,7 +248,7 @@ double expression()
 {
 	double left = term();
 	while (true) {
-		Token t = ts.get();
+		Token t = ts.get(input);
 		switch (t.kind) {
 		case '+':
 			left += term();
@@ -265,10 +266,10 @@ double expression()
 double assignment()
 {
 	// We get there by knowing that a name and an '=' come next.
-	Token t = ts.get();
+	Token t = ts.get(input);
 	string var_name = t.name;
 	if (!table.is_declared(var_name)) error(var_name, " has not been declared");
-	ts.get(); // Get rid of the '='
+	ts.get(input); // Get rid of the '='
 	double d = expression();
 	table.set(var_name, d);
 	return d;
@@ -276,12 +277,12 @@ double assignment()
 
 double declaration()
 {
-	Token t1 = ts.get(); //let or const
-	Token t2 = ts.get(); //name of var
+	Token t1 = ts.get(input); //let or const
+	Token t2 = ts.get(input); //name of var
 	if (t2.kind != name) error("name expected in declaration");
 	string name = t2.name;
 	if (table.is_declared(name)) error(name, " declared twice");
-	Token t3 = ts.get();
+	Token t3 = ts.get(input);
 	if (t3.kind != '=') error("= missing in declaration of ", name);
 	double d = expression();
 	switch(t1.kind) {
@@ -295,14 +296,14 @@ double declaration()
 
 double statement()
 {
-	Token t = ts.get();
+	Token t = ts.get(input);
 	switch (t.kind) {
 	case let: case con:
 		ts.putback(t);
 		return declaration();
 	case name:
 	{
-		Token t2 = ts.get();
+		Token t2 = ts.get(input);
 		// Whatever t2 is, we have to rollback
 		ts.putback(t2);
 		ts.putback(t);
@@ -334,8 +335,8 @@ void calculate()
 {
 	while (true) try {
 		cout << prompt;
-		Token t = ts.get();
-		while (t.kind == print) t = ts.get();
+		Token t = ts.get(input);
+		while (t.kind == print) t = ts.get(input);
 		if (t.kind == quit) return;
 		ts.putback(t);
 		cout << result << statement() << endl;
